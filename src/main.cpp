@@ -180,7 +180,7 @@ void printPath(std::vector<std::vector<Node> > routeMap, Node dest)
 
 
 bool notBlocked(std::vector<std::vector<Node> > routeMap, int x, int y) {
-    return (routeMap[x][y].blocked == 0 || routeMap[x][y].shadowed);
+    return (routeMap[x][y].blocked == 0);
 }
 
 int countPath(std::vector<std::vector<Node> > routeMap, Node dest)
@@ -292,6 +292,122 @@ std::vector<std::vector<Node> > initializeMapVert(int grid[9][10], int image_hei
     return routeMap;
 }
 
+std::stack<Node> makePath(std::vector<std::vector<Node> > routeMap, Node dest) {
+    std::stack<Node> path;
+    int row = dest.x;
+    int col = dest.y;
+    // printf("176 CountPath %d %d \n", row, col);
+    // stack<Pair> Path;
+    int i = 0;
+    // printf("179 %d \n", routeMap[row][col].parent);
+    while (!((*routeMap[row][col].parent).x == row && (*routeMap[row][col].parent).y == col)) { //The source parent points to itself
+        // Pair p = make_pair(row,col);
+        // Path.push(p);
+        // printf("182 %d \n", i);
+        int temp_row = (*routeMap[row][col].parent).x;
+        int temp_col = (*routeMap[row][col].parent).y;
+        path.push(routeMap[row][col]);
+        row = temp_row;
+        col = temp_col;
+        
+    }
+    // printf("188 Returning from count path\n", row, col);
+    return path;
+}
+
+
+std::stack<Node> getAStarPath(std::vector<std::vector<Node> > routeMap, std::vector<std::pair<int, int> > destinations, int numAntennas, int image_width, int image_height) {
+    // std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
+    std::stack<Node> path;
+    int start_x = destinations[0].first;
+    int start_y = destinations[0].second;
+    Node start = routeMap[start_x][start_y];
+    start.x = start_x;
+    start.y = start.y;
+    routeMap[start_x][start_y] = start;
+    routeMap[start_x][start_y].parent = &(routeMap[start_x][start_y]);
+    path.push(start);
+    
+    for (int dest = 0; dest < numAntennas; dest++) {
+        start_x = destinations[dest].first;
+        start_y = destinations[dest].second;
+        
+        start = routeMap[start_x][start_y];
+        start.x = start_x;
+        start.y = start.y;
+        routeMap[start_x][start_y] = start;
+        routeMap[start_x][start_y].parent = &(routeMap[start_x][start_y]);
+        std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
+        frontier.push(routeMap[start_x][start_y]);
+        int goal_x = destinations[dest+1].first;
+        int goal_y = destinations[dest+1].second;
+        printf("336 %d %d %d %d\n", start_x, start_y, goal_x, goal_y);
+        bool keepGoing = true;
+        while (!frontier.empty() && keepGoing) {
+            Node current = frontier.top();
+            frontier.pop();
+            
+            // Check for goal
+            int x = current.x;
+            int y = current.y;
+            // printf("100 %d %d\n", x, y);
+            // preventedPaths[x][y] = true;
+
+            int newHeur, newCost;
+            // Expand to neighbors
+            for (int dx = -1; dx < 2; dx++) { //Rows
+                for (int dy = -1; dy < 2; dy++) { //Cols can only move forward
+                    if ((dx == 0 || dy == 0) && keepGoing) { //Don't allow diagonals now
+                        if (validDirection(x, y, dx, dy, image_width, image_height)) {
+                            // printf("112 \n");
+                            if (x + dx == goal_x && y + dy == goal_y) {
+                                // printf("Found goal %d %d \n", x + dx, x + dy);
+                                Node n = routeMap[x+dx][y+dy];
+                                n.cost = newCost;
+                                n.heuristic = newHeur;
+                                n.x = x + dx;
+                                n.y = y + dy;
+                                routeMap[x + dx][y + dy] = n;
+                                routeMap[x + dx][y + dy].parent = &(routeMap[x][y]);
+                                // printf("HEREHERE %d %d %d %d %d %d \n", x + dx, x+dy, routeMap[x + dx][y + dy].x, routeMap[x][y],  routeMap[x][y].x,  routeMap[x][y].y);
+                                // printPath(routeMap, routeMap[x + dx][y + dy]);
+                                std::stack<Node> tempPath = makePath(routeMap, routeMap[x + dx][y + dy]);
+                                while (!tempPath.empty()) {
+                                    Node n = tempPath.top();
+                                    tempPath.pop();
+                                    path.push(n);
+                                }
+                                keepGoing = false;
+                                // return std::make_pair(countPath(routeMap, routeMap[x + dx][y + dy]), routeMap);
+                            }
+                            else if (notBlocked(routeMap, x+dx, y+dy)) {
+                                // printf("120 \n");
+                                newCost = routeMap[x][y].cost + 1;
+                                newHeur = calcHeur(x + dx, y + dy, goal_x, goal_y);
+
+                                if (routeMap[x + dx][y + dy].cost == -1 || routeMap[x + dx][y + dy].cost + routeMap[x + dx][y + dy].heuristic > newCost + newHeur) {
+                                    // printf("125 \n");
+                                    Node n = routeMap[x+dx][y+dy];
+                                    n.cost = newCost;
+                                    n.heuristic = newHeur;
+                                    n.x = x + dx;
+                                    n.y = y + dy;
+                                    n.parent = &(routeMap[x][y]);
+                                    routeMap[x + dx][y + dy] = n;
+                                    frontier.push(n);
+                                }
+                            }
+                            // printf("136 \n");
+                        }
+                        // printf("138 \n");
+                    }
+                }
+            }
+        }
+    }
+    return path;
+}
+
 
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
@@ -355,7 +471,7 @@ int main(int argc, char** argv) {
     // std::vector<int> y = x;
     
     // y[1] = 2;
-    printf("HERE %d %d \n", x[1], y[1]);
+    // printf("HERE %d %d \n", x[1], y[1]);
 
     printf("313 %d %d %d %d \n", world_rank, heightPerProc, startingHeight, endingHeight);
 
@@ -397,6 +513,8 @@ int main(int argc, char** argv) {
     //If parallel
     int minValuePath = INT_MAX;
     Node minStartingPath;
+    std::stack<Node> finalPath;
+    int localMinCount = 0;
     if (world_size != 0) {
         
         if (false && world_rank == 0) {   //Ignoring solo processor for right now
@@ -442,124 +560,99 @@ int main(int argc, char** argv) {
             int start = 0;
 
             int minTotalStartingCount = INT_MAX;
+            std::vector<std::pair<int, int> > totalMinAntennas(numAntennas + 1);
             Node minStartingNode;
-            for (int si = 0; si < counts[0]; si++) {
+            for (int si = 0; si < counts[0]; si++) { //Vary the starting row
                 int startX = antennaList[0][si].first;
                 int startY = antennaList[0][si].second;
-                std::vector<std::vector<Node> > tempStartingRouteMap = initializeMapVert(grid, image_height, image_width, startingHeight, endingHeight);
-                // printf("429 %d %d \n", startX, startY);
                 Node startingNode = routeMap[startX][startY];
                 startingNode.x = startX;
                 startingNode.y = startY;
                 startingNode.parent = &(startingNode);
                 routeMap[startX][startY] = startingNode;
                 Node sourceNode = startingNode;
+                std::vector<std::pair<int, int> > minAntennasPerStart(numAntennas + 1);
                 int countPerStartingNode = 0;
                 dest = 0;
                 Node minFinDest;
-                // printf("389 %d \n", si);
-                while (dest < numAntennas) { //Does a greedy algorithm
-                    // printf("391 %d \n", dest);
+                bool keepGoing = true;
+                while (dest < numAntennas && keepGoing) { //Greedy algo to find the minimum route for a given starting node
                     dest++;
                     int min = INT_MAX;
                     Node minDest;
-                    std::vector<std::vector<Node> > tempRouteMapPerAntenna = tempStartingRouteMap;
-
-                    for (int i = 0; i < counts[dest]; i++) {
+                    for (int i = 0; i < counts[dest]; i++) { //Check each potential antenna placement at a given site
                         std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
                         frontier.push(sourceNode);
-                        std::vector<std::vector<Node> > tempRouteMapPerPossibility = tempRouteMapPerAntenna;
-                        printf("435 %d %d \n", (*sourceNode.parent).x, (*sourceNode.parent).y);
                         int dest_x = antennaList[dest][i].first;
                         int dest_y = antennaList[dest][i].second;
-                        // printf("438 %d %d \n", dest_x, dest_y);
                         std::pair<int, std::vector<std::vector<Node> > > AStarRes = doAStar(frontier, routeMap, preventedPaths, came_from, cost_so_far, image_width, image_height, dest_x, dest_y);
                         int c = AStarRes.first;
                         routeMap = AStarRes.second;
-                        printf("440 %d %d %d \n", dest_x, dest_y, c);
-                        if (c > 0 && (c < min)) {
-                            // printf("440 %d %d \n", dest_x, dest_y);
-                            // Node n = routeMap[dest_x][dest_y];
-                            // n.x = dest_x;
-                            // n.y = dest_y;
-                            // n.cost = c;
-                            // routeMap[dest_x][dest_y] = n;
+                        if (c > 0 && (c < min)) { //Check if min across different destinations
                             minDest = routeMap[dest_x][dest_y];
                             min = c;
+                            minAntennasPerStart[dest] = std::make_pair(dest_x, dest_y);
                             if (dest == numAntennas - 1) {
                                 routeMap[dest_x][dest_y].parent = &(routeMap[dest_x][dest_y]);
                                 minFinDest = routeMap[dest_x][dest_y];
-                                printf("468 %d %d %d \n", minFinDest.parent, (*minFinDest.parent).x, (*minFinDest.parent).y);
                             }
                         }
                     }
-                    if (min != INT_MAX) {
+                    if (min != INT_MAX) { //Get min 
                         countPerStartingNode += min;
+                        sourceNode = minDest;
+                    } else {
+                        keepGoing = false;
                     }
-                    sourceNode = minDest;
-                    // printf("459 %d %d \n", sourceNode.x, sourceNode.y);
-                    printf("460 %d %d \n", minDest.x, minDest.y);
+                    
                 }
-                // printf("469 %d %d %d", world_rank, sourceNode.x, sourceNode.y);
-                if (countPerStartingNode > 0) {
+
+                if (countPerStartingNode > 0) { //Get distance from last node to the final one.
                     std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
                     frontier.push(minFinDest);
                     std::pair<int, std::vector<std::vector<Node> > > AStarRes = doAStar(frontier, routeMap, preventedPaths, came_from, cost_so_far, image_width, image_height, startingNode.x, image_width - 1);
                     int final_count = AStarRes.first;
                     routeMap = AStarRes.second;
-                    printf("451 %d %d \n", world_rank, final_count);
                     if (final_count > 0) {
                         if (countPerStartingNode > 0 && (countPerStartingNode < minTotalStartingCount)) {
+                            totalMinAntennas = minAntennasPerStart;
+                            totalMinAntennas[0] = make_pair(startingNode.x, startingNode.y);
                             countPerStartingNode = final_count;
                             minTotalStartingCount = countPerStartingNode;
                             minStartingNode = startingNode;
-                            printf("507 %d %d \n", minStartingNode.x, (*routeMap[minStartingNode.x][image_width - 1].parent).x);
                         }
                     }
                 }
             }
+
+            //Now get the path 
             minValuePath = minTotalStartingCount;
             minStartingPath = minStartingNode;
             if (minValuePath == -1) {
                 minValuePath = INT_MAX;
             }
-            printf("408 %d %d \n", world_rank, minValuePath);
-            printf("     487 %d %d \n", minStartingNode.x, image_width-1);
-            printf("%d %d %d %d \n", routeMap[minStartingNode.x][image_width-1].x, routeMap[minStartingNode.x][image_width-1].y, (*routeMap[minStartingNode.x][image_width-1].parent).x, (*routeMap[minStartingNode.x][image_width-1].parent).parent);
-            printPath(routeMap, routeMap[minStartingNode.x][image_width-1]);
-
-
-            
-            // tracking[changingDest] = 0;
-            // changingDest--;
-            
-
-            // for (int j = 0; j < numAntennas; j ++) {
-            //     // Node startingPoint = findAntennaHeight(routeMap, startingHeight, (world_rank + 1)*heightPerProc, j, image_width, image_height, antennaLists, numAntennas);
-                
-            //     int goal_x = 0;
-            //     int goal_y = 0;
-            //     int sy = 0;
-
-            //     int sx = 0;
-            //     routeMap[sx][sy].x = sx;
-            //     routeMap[sx][sy].y = sy;
-            //     routeMap[sx][sy].cost = 0;
-            //     routeMap[sx][sy].heuristic = 0;
-            //     routeMap[sx][sy].parent = &(routeMap[sx][sy]);
-            //     frontier.push(routeMap[sx][sy]);
-                
-            //     int c = doAStar(frontier, routeMap, preventedPaths, came_from, cost_so_far, image_width, image_height, goal_x, goal_y);
-            //     if (min == -1 || (c < min)) {
-            //         min = c;
-            //     }
-            // }
-
+            printf("624 %d %d \n", totalMinAntennas[0].first, image_width -1);
+            totalMinAntennas[numAntennas] = make_pair(totalMinAntennas[0].first, image_width - 1);
+            for (int i = 0; i <= numAntennas; i++) {
+                printf("517 %d %d \n", totalMinAntennas[i].first, totalMinAntennas[i].second);
+            }
 
             
+            routeMap = initializeMapVert(grid, image_height, image_width, startingHeight, endingHeight);
+            std::stack<Node> path = getAStarPath(routeMap, totalMinAntennas, numAntennas, image_width, image_height);
+            
+            
+            printf("The path is: ");
+            while (!path.empty()) {
+                Node n = path.top();
+                path.pop();
+                printf("(%d, %d)-> ", n.x, n.y);
+                finalPath.push(n);
+                localMinCount++;
+            }
+            printf("\n");
+            printf("Which has a length of %d \n", minValuePath);
 
-                // Send results back to the master
-                // MPI_Send(...);
         }
     } else {
 
@@ -599,20 +692,26 @@ int main(int argc, char** argv) {
     }
     // Your code here
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("502 %d \n", world_rank);
+    // printf("502 %d \n", world_rank);
     int procres[2];
-    procres[0] = minValuePath;
+    procres[0] = localMinCount;
     procres[1] = world_rank;
     int globalres[2];
     // MPI_Allreduce(procres, globalres, 1, MPI_2INT, MPI_MINLOC, MPI_COMM_WORLD);
     
     printf("509 %d \n", world_rank);
-    // if ((minValuePath > 0) && world_rank == globalres[1]) {
-    //     printf("511 %d %d %d \n", world_rank, image_width - 1, minStartingPath.x);
-    //     printf("533 %d %d \n", routeMap[minStartingPath.x][image_width-1].x, minStartingPath.y);
-    //     printPath(routeMap, routeMap[minStartingPath.x][image_width-1]);
-    //     printf("513 %d \n", world_rank);
-    // }
+    if ((minValuePath > 0) && world_rank == globalres[1]) {
+        printf("511 %d %d %d \n", world_rank, image_width - 1, minStartingPath.x);
+        printf("533 %d %d \n", routeMap[minStartingPath.x][image_width-1].x, minStartingPath.y);
+        while (!finalPath.empty()) {
+            Node n = finalPath.top();
+            finalPath.pop();
+            printf("(%d, %d)-> ", n.x, n.y);
+        }
+        printf("\n");
+        // printPath(routeMap, routeMap[minStartingPath.x][image_width-1]);
+        // printf("513 %d \n", world_rank);
+    }
 
     MPI_Finalize();
     return 0;
