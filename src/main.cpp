@@ -211,6 +211,8 @@ std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > fin
 
 std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > findAntennasHeightAcrossWidth(int grid[5058][5058], std::vector<std::vector<Node> > routeMap, int startingWidth, int endingWidth, int image_width, int image_height, int numAntennasPerProc) {
     int maxColCount = 30;
+    int maxNumAntennas = 20;
+    int placedAntennas = 0;
     std::vector<std::vector<std::pair<int,int> > > antennaList(numAntennasPerProc, std::vector<std::pair<int, int> >(maxColCount*image_height));
     std::vector<int> counts(numAntennasPerProc);
     int sepBetAnt = (endingWidth - startingWidth)/numAntennasPerProc;
@@ -224,18 +226,11 @@ std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > fin
     int currCounts = 0;
     int countCounts = 0;
     while (count < numAntennasPerProc && sCol < image_width) {
-        // if (startingWidth == 0) {
-        //             printf("228 %d %d %d \n", sCol, image_width, startingWidth);
-        // }
-        // printf("153 %d %d %d %d \n", count, countCounts, currCounts, sCol);
         if (sCol > image_width || (sCol < startingWidth)) {
             std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > r = make_pair(antennaList, counts);
             return r;
         }
-        for (int i = 0; i < image_height; i++) {
-            // if (startingWidth == 0) {
-            //     printf("237 %d %d %d \n", sCol, image_width, startingWidth);
-            // }            
+        for (int i = 0; i < image_height; i++) {         
             if (goodForAntenna(grid, routeMap, image_width, image_height, i, sCol)) {
                 // if (startingWidth == 0) {
                 //     printf("HERHEHREREH \n");
@@ -244,6 +239,7 @@ std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > fin
                 // printf("89 %d %d \n", i, sCol);
                 antennaList[count][countCounts + currCounts].first = i;
                 antennaList[count][countCounts + currCounts].second = sCol;
+                placedAntennas++;
                 // printf("93 %d %d %d \n", count, antennaList[count][countCounts + currCounts].first, antennaList[count][countCounts + currCounts].second);
                 currCounts++;
             }
@@ -254,7 +250,7 @@ std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > fin
             sCol = startingWidth;
             sCol = std::min(sCol, image_width);
             counts[count] = countCounts;
-            
+            placedAntennas = 0;
             countCounts = 0;
             colCount = 0;
             currCounts = 0;
@@ -407,7 +403,7 @@ std::pair<int, std::vector<std::vector<Node> > > doAStar(std::priority_queue<Nod
             }
         }
     }
-    // printf("Can't get a path under those conditions %d %d %d %d %d %d %d\n", startNode.x, startNode.y, goal_x, goal_y, image_height, image_width);
+    // printf("Can't get a path under those conditions %d %d %d %d %d %d\n", startNode.x, startNode.y, goal_x, goal_y, image_height, image_width);
     // printf("Can't get a path under those conditions %d %d %d %d %d %d\n", startNode.x, startNode.y, goal_x, goal_y, routeMap[startNode.x][startNode.y].shadowed, routeMap[goal_x][goal_y].shadowed);
     return std::make_pair(-1, routeMap);
 }
@@ -555,7 +551,7 @@ std::stack<Node> getAStarPath(std::vector<std::vector<Node> > routeMap, std::vec
 
 
 
-std::pair<int, int> getAStarPathToNearestEdge(std::vector<std::vector<Node> > routeMap, int image_width, int image_height, int startingHeight, int endingHeight, int start_x, int start_y, int goal_x) {
+std::pair<int, int> getAStarPathToNearestEdge(std::vector<std::vector<Node> > routeMap, int image_width, int image_height, int startingHeight, int endingHeight, int start_x, int start_y, int goal_y) {
     // printf("96 \n");
     std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
     std::vector<std::vector<bool> > possiblePath(image_height, std::vector<bool>(image_width));
@@ -585,7 +581,7 @@ std::pair<int, int> getAStarPathToNearestEdge(std::vector<std::vector<Node> > ro
                 if (dx == 0 || dy == 0) { //Don't allow diagonals now
                     if (validDirection(x, y, dx, dy, image_width, image_height, startingHeight, endingHeight)) {
                         // printf("112 \n");
-                        if (x + dx == goal_x) {
+                        if (y + dy == goal_y) {
                             // printf("Found goal %d %d \n", x + dx, x + dy);
                             Node n = routeMap[x+dx][y+dy];
                             n.cost = newCost;
@@ -596,12 +592,12 @@ std::pair<int, int> getAStarPathToNearestEdge(std::vector<std::vector<Node> > ro
                             routeMap[x + dx][y + dy].parent = &(routeMap[x][y]);
                             // printf("HEREHERE %d %d %d %d %d %d \n", x + dx, x+dy, routeMap[x + dx][y + dy].x, routeMap[x][y],  routeMap[x][y].x,  routeMap[x][y].y);
                             // printPath(routeMap, routeMap[x + dx][y + dy]);
-                            return make_pair(countPath(routeMap, routeMap[x + dx][y + dy], start_x, start_y), y+dy);
+                            return make_pair(countPath(routeMap, routeMap[x + dx][y + dy], start_x, start_y), x+dx);
                         }
                         else if ((!possiblePath[x+dx][y+dy]) && notBlocked(routeMap, x+dx, y+dy)) {
                             // printf("120 \n");
                             newCost = routeMap[x][y].cost + 1;
-                            newHeur = calcHeur(x + dx, y + dy, goal_x, y+dy);
+                            newHeur = calcHeur(x + dx, y + dy, x+dx, goal_y);
 
                             if (routeMap[x + dx][y + dy].cost == -1 || routeMap[x + dx][y + dy].cost + routeMap[x + dx][y + dy].heuristic > newCost + newHeur) {
                                 // printf("125 \n");
@@ -623,7 +619,7 @@ std::pair<int, int> getAStarPathToNearestEdge(std::vector<std::vector<Node> > ro
             }
         }
     }
-    // printf("Can't get a path under those conditions %d %d %d\n", startNode.x, startNode.y, goal_x);
+    // printf("Can't get a path under those conditions %d %d %d\n", startNode.x, startNode.y, goal_y);
     return make_pair(-1, -1);
 }
 
@@ -641,7 +637,7 @@ int main(int argc, char** argv) {
 
     // image_height = 9;
     // image_width = 10;
-    const int image_height = 5058 / 8;
+    const int image_height = 5058 / 16;
     const int image_width = 5058 / 16;
 
     const int numAntennas = 8;
@@ -721,6 +717,7 @@ int main(int argc, char** argv) {
     int endingWidth = image_width;
     if (!doVert) {
         endingWidth = widthPerProc * (world_rank+1);
+        endingWidth = std::min(endingWidth, image_width);
     }
     // int endingWidth = widthPerProc * (world_rank + 1);
     int startingHeight = heightPerProc * world_rank;
@@ -1031,9 +1028,9 @@ int main(int argc, char** argv) {
         int sendingCount = 0;
         for (int i = 0; i < numAntennasPerProc; i++) {
                 printf("Rank %d Antenna %d Count %d \n", world_rank, i, counts[i]);
-                // for (int j = 0; j < counts[i]; j++) {
-                //     printf("Antenna %d count %d has x = %d y = %d \n", i, j, antennaList[i][j].first, antennaList[i][j].second);
-                // }
+                for (int j = 0; j < counts[i]; j++) {
+                    printf("Antenna %d count %d has x = %d y = %d \n", i, j, antennaList[i][j].first, antennaList[i][j].second);
+                }
             }
         printf("%d Rank has found antennas \n", world_rank);
         for (int i = 0; i < counts[0]; i++) {
@@ -1166,6 +1163,9 @@ int main(int argc, char** argv) {
                     frontier.push(minFinDest);
                     std::pair<int, std::vector<std::vector<Node> > > AStarRes = doAStar(frontier, routeMap, preventedPaths, came_from, cost_so_far, image_width, image_height, 0, image_height, minFinDest.x, minFinDest.y, destAntenna[j], endingWidth - 1); //Now need to iterate to each of the 
                     int minFinalCount = AStarRes.first;
+                    // if (world_rank == 7) {
+                    //    printf("1161 %d %d %d %d %d \n", minFinDest.x, minFinDest.y, endingWidth, destAntenna[j], minFinalCount);
+                    // }
                     // printf("1161 %d %d %d %d %d \n", minFinDest.x, minFinDest.y, endingWidth, destAntenna[j], minFinalCount);
                     routeMap = AStarRes.second;
                     if (minFinalCount > 0 && (final_count == -1 || minFinalCount < final_count)) {
@@ -1197,6 +1197,11 @@ int main(int argc, char** argv) {
         printf("%d Rank has a min path of %d \n", world_rank, minPaths[0].second);
         MPI_Barrier(MPI_COMM_WORLD);
         MPI_Bcast(&(numIters), 1, MPI_INT, 0, MPI_COMM_WORLD);
+        if (world_rank == 7) {
+            for (int i = 0; i < counts[0]; i++) {
+                printf("Rank 7 has value %d for %d \n", minPaths[i].second, i);
+            }
+        }
         for (int i = 0; i < numIters; i++) {
             // printf("Rank %d on iter %d\n", world_rank, i);
             minForPath = INT_MAX;
