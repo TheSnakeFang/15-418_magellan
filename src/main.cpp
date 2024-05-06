@@ -529,8 +529,8 @@ int main(int argc, char** argv) {
 
     int starting_x = 0;
 
-    const int image_height = 5058/16;
-    const int image_width = 5058/16;
+    const int image_height = 5058/4;
+    const int image_width = 5058;
 
     const int numAntennas = 3;
 
@@ -801,35 +801,26 @@ int main(int argc, char** argv) {
         if (world_rank == 0) { //Process 0 sends to last first
             MPI_Send(&sendingCount, 1, MPI_INT, world_size - 1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_size-1, 0, MPI_COMM_WORLD);
-            // printf("1040 %d \n", world_rank);
             MPI_Recv(&destCount, 1, MPI_INT, 1, 0, MPI_COMM_WORLD, &status);
-            // printf("1042 %d %d\n", world_rank, destCount);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, 1, 0, MPI_COMM_WORLD, &status);
         } else if (world_rank == world_size - 1) { 
             MPI_Recv(&destCount, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-            // printf("1046 %d \n", world_rank);
-            // printf("1048 %d %d\n", world_rank, destCount);
             MPI_Send(&sendingCount, 1, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
 
         } else if (world_rank % 2 == 0) { //Even ranks send back first
             MPI_Send(&sendingCount, 1, MPI_INT, world_rank - 1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
-            // printf("1053 %d \n", world_rank);
             MPI_Recv(&destCount, 1, MPI_INT, world_rank+1, 0, MPI_COMM_WORLD, &status);
-            // printf("1057 %d %d\n", world_rank, destCount);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, world_rank+1, 0, MPI_COMM_WORLD, &status);
         } else { //odd ranks recieve first
             MPI_Recv(&destCount, 1, MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD, &status);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD, &status);
-            // printf("1059 %d \n", world_rank);
-            // printf("1063 %d %d\n", world_rank, destCount);
             MPI_Send(&sendingCount, 1, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
         }
 
-        // printf("%d Rank has finished initial sends and recieves \n", world_rank);
         //Each element is the ((start_x,start_y), (end_x, end,y), cost)
         std::vector<std::pair<std::pair<std::pair<int, int>, std::pair<int,int> >, int> > minPaths(counts[0]);
         for (int i =0; i < counts[0]; i++) {
@@ -878,7 +869,6 @@ int main(int argc, char** argv) {
                             minFinDest = routeMap[dest_x][dest_y];
                         }
                     }
-                    // printf("593 %d \n", min);
                 }
                 if (min != INT_MAX) { //Get min 
                     countPerStartingNode += min;
