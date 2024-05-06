@@ -18,17 +18,11 @@ Authors: Kevin Fang (kevinfan) and Nikolai Stefanov (nstefano) */
 #include "shadow_map.h"
 using namespace std;
 
-
 #include <unordered_map>
-
 
 // Shortcut
 typedef std::pair<int, int> Pair;
 
-
-
-
-// Are we going to use Nodes? Squares? At which fidelity?
 struct Node {
     int x, y; // Node coordinates
     float cost; // Cost to reach this node
@@ -519,8 +513,6 @@ std::pair<int, int> getAStarPathToNearestEdge(std::vector<std::vector<Node> > ro
     }
     return make_pair(-1, -1);
 }
-
-
 
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
