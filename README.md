@@ -7,6 +7,3 @@ URL: thesnakefang.github.io
 # Contact
 Kevin Fang - kevinfang@cmu.edu
 Nikolai Stefanov - nstefano@andrew.cmu.edu
-
-# About
-Parallel application using MPI in C++ to calculate the shortest safe path between two locations on the moon on-the-fly using Lunar Reconnaissance Orbiter (LRO) lunar surface imagery data.

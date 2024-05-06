@@ -39,5 +39,7 @@
 build/
 bin/
 
+# Debug Symbols
+*.dSYM/
 
 
