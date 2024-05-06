@@ -374,6 +374,7 @@ std::stack<Node> makePath(std::vector<std::vector<Node> > routeMap, Node dest) {
 //Returns the path laid out by A* algorithm hitting each of the destinations in the form of a stack of vertices. 
 std::stack<Node> getAStarPath(std::vector<std::vector<Node> > routeMap, std::vector<std::pair<int, int> > destinations, int numAntennas, int image_width, int image_height, int startingHeight, int endingHeight) {
     std::stack<Node> path;
+    std::vector<std::vector<bool> > possiblePath(image_height, std::vector<bool>(image_width));
     int start_x = destinations[0].first;
     int start_y = destinations[0].second;
     Node start = routeMap[start_x][start_y];
@@ -428,7 +429,7 @@ std::stack<Node> getAStarPath(std::vector<std::vector<Node> > routeMap, std::vec
                                 }
                                 keepGoing = false;
                             }
-                            else if (notBlocked(routeMap, x+dx, y+dy)) {
+                            else if ((!possiblePath[x+dx][y+dy]) && notBlocked(routeMap, x+dx, y+dy)) {
                                 newCost = routeMap[x][y].cost + 1;
                                 newHeur = calcHeur(x + dx, y + dy, goal_x, goal_y);
                                 if (routeMap[x + dx][y + dy].cost == -1 || routeMap[x + dx][y + dy].cost + routeMap[x + dx][y + dy].heuristic > newCost + newHeur) {
@@ -521,14 +522,14 @@ int main(int argc, char** argv) {
 
     int starting_x = 0;
 
-    const int image_height = 5058/4;
-    const int image_width = 5058;
+    const int image_height = 5058/16;
+    const int image_width = 5058/16;
 
     const int numAntennas = 3;
 
-    bool doVert = true; //Change to false to get horizontal parallelization
+    bool doVert = true; // Change to false to get horizontal parallelization
     
-    //Get type of mode (Mostly ignored for now)
+    // Get type of mode (Mostly ignored for now)
     if (argc >= 2) {
         for (int i = 0; i < argc; i++) {
             if (strcmp(argv[i],"b") == 0) { 
@@ -548,10 +549,10 @@ int main(int argc, char** argv) {
     int widthPerProc = image_width/world_size;
     int heightPerProc = image_height/world_size;
 
-    if (widthPerProc * world_size < image_width) { //Probably want to change in future.
+    if (widthPerProc * world_size < image_width) {
         widthPerProc += 1;
     }
-    if (heightPerProc * world_size < image_height) { //Probably want to change in future.
+    if (heightPerProc * world_size < image_height) { 
         heightPerProc += 1;
     }
 
@@ -603,7 +604,7 @@ int main(int argc, char** argv) {
         endingWidth = widthPerProc * (world_rank+1);
         endingWidth = std::min(endingWidth, image_width);
     }
-    // int endingWidth = widthPerProc * (world_rank + 1);
+
     int startingHeight = heightPerProc * world_rank;
     int endingHeight = heightPerProc * (world_rank + 1);
     int distanceBetweenAntennas = image_width/numAntennas;
@@ -680,11 +681,11 @@ int main(int argc, char** argv) {
                 dest = 0;
                 Node minFinDest;
                 bool keepGoing = true;
-                while (dest < numAntennas && keepGoing) { //Greedy algo to find the minimum route for a given starting node
+                while (dest < numAntennas && keepGoing) { // Greedy algo to find the minimum route for a given starting node
                     dest++;
                     int min = INT_MAX;
                     Node minDest;
-                    for (int i = 0; i < counts[dest]; i++) { //Check each potential antenna placement at a given site
+                    for (int i = 0; i < counts[dest]; i++) { // Check each potential antenna placement at a given site
                         std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
                         frontier.push(sourceNode);
                         int dest_x = antennaList[dest][i].first;
@@ -692,7 +693,7 @@ int main(int argc, char** argv) {
                         std::pair<int, std::vector<std::vector<Node> > > AStarRes = doAStar(frontier, routeMap, preventedPaths, came_from, cost_so_far, image_width, image_height, startingHeight, endingHeight, sourceNode.x, sourceNode.y, dest_x, dest_y);
                         int c = AStarRes.first;
                         routeMap = AStarRes.second;
-                        if (c > 0 && (c < min)) { //Check if min across different destinations
+                        if (c > 0 && (c < min)) { // Check if min across different destinations
                             minDest = routeMap[dest_x][dest_y];
                             min = c;
                             minAntennasPerStart[dest] = std::make_pair(dest_x, dest_y);
@@ -702,7 +703,7 @@ int main(int argc, char** argv) {
                             }
                         }
                     }
-                    if (min != INT_MAX) { //Get min 
+                    if (min != INT_MAX) { // Get min 
                         countPerStartingNode += min;
                         sourceNode = minDest;
                     } else {
@@ -711,7 +712,7 @@ int main(int argc, char** argv) {
                     
                 }
 
-                if (countPerStartingNode > 0) { //Get distance from last node to the final one.
+                if (countPerStartingNode > 0) { // Get distance from last node to the final one.
                     std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
                     frontier.push(minFinDest);
                     std::pair<int, std::vector<std::vector<Node> > > AStarRes = doAStar(frontier, routeMap, preventedPaths, came_from, cost_so_far, image_width, image_height, startingHeight, endingHeight, minFinDest.x, minFinDest.y, startingNode.x, image_width - 1 );
@@ -727,7 +728,6 @@ int main(int argc, char** argv) {
                         }
                     }
                 }
-                // printf("621 \n");
             }
 
 
@@ -735,7 +735,7 @@ int main(int argc, char** argv) {
             dataSearchTime = std::chrono::high_resolution_clock::now(); 
             spendSearchingData = dataSearchTime - findAntennasTime;
 
-            //Now get the path 
+            // Now get the path 
             minValuePath = minTotalStartingCount;
             minStartingPath = minStartingNode;
             if (minValuePath == -1) {
@@ -752,7 +752,7 @@ int main(int argc, char** argv) {
             std::stack<Node> path = getAStarPath(routeMap, totalMinAntennas, numAntennas, image_width, image_height, 0, image_height);
             
             
-            //Now orient path in correct order and print if you so desire
+            // Now orient path in correct order and print if you so desire
             while (!path.empty()) {
                 Node n = path.top();
                 path.pop();
@@ -763,7 +763,7 @@ int main(int argc, char** argv) {
 
         }
     }
-    else { //Do parallelization across width
+    else { // Do parallelization across width
         routeMap = initializeMapVert(grid, image_height, image_width, 0, image_height);
         std::pair<std::vector<std::vector<std::pair<int,int> > >, std::vector<int> > antennaPair = findAntennasHeightAcrossWidth(grid, routeMap, startingWidth, endingWidth, image_width, image_height, numAntennasPerProc);
         std::vector<std::vector<std::pair<int,int> > > antennaList = antennaPair.first;
@@ -785,7 +785,7 @@ int main(int argc, char** argv) {
 
 
 
-        //Do the sendings and receivings of the initial 
+        // Do the sendings and receivings of the initial 
         std::vector<int> destAntenna(image_width * image_height); 
         int destCount;
         MPI_Status status;
@@ -793,27 +793,36 @@ int main(int argc, char** argv) {
         if (world_rank == 0) { //Process 0 sends to last first
             MPI_Send(&sendingCount, 1, MPI_INT, world_size - 1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_size-1, 0, MPI_COMM_WORLD);
+            // printf("1040 %d \n", world_rank);
             MPI_Recv(&destCount, 1, MPI_INT, 1, 0, MPI_COMM_WORLD, &status);
+            // printf("1042 %d %d\n", world_rank, destCount);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, 1, 0, MPI_COMM_WORLD, &status);
         } else if (world_rank == world_size - 1) { 
             MPI_Recv(&destCount, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+            // printf("1046 %d \n", world_rank);
+            // printf("1048 %d %d\n", world_rank, destCount);
             MPI_Send(&sendingCount, 1, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
 
         } else if (world_rank % 2 == 0) { //Even ranks send back first
             MPI_Send(&sendingCount, 1, MPI_INT, world_rank - 1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
+            // printf("1053 %d \n", world_rank);
             MPI_Recv(&destCount, 1, MPI_INT, world_rank+1, 0, MPI_COMM_WORLD, &status);
+            // printf("1057 %d %d\n", world_rank, destCount);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, world_rank+1, 0, MPI_COMM_WORLD, &status);
         } else { //odd ranks recieve first
             MPI_Recv(&destCount, 1, MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD, &status);
             MPI_Recv(&destAntenna[0], destCount, MPI_INT, world_rank + 1, 0, MPI_COMM_WORLD, &status);
+            // printf("1059 %d \n", world_rank);
+            // printf("1063 %d %d\n", world_rank, destCount);
             MPI_Send(&sendingCount, 1, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
             MPI_Send(&sendAntennas[0], sendingCount, MPI_INT, world_rank-1, 0, MPI_COMM_WORLD);
         }
 
-        //Each element is the ((start_x,start_y), (end_x, end,y), cost)
+        // printf("%d Rank has finished initial sends and recieves \n", world_rank);
+        // Each element is the ((start_x,start_y), (end_x, end,y), cost)
         std::vector<std::pair<std::pair<std::pair<int, int>, std::pair<int,int> >, int> > minPaths(counts[0]);
         for (int i =0; i < counts[0]; i++) {
             minPaths[i].second = INT_MAX;
@@ -823,8 +832,8 @@ int main(int argc, char** argv) {
         int minTotalStartingCount = INT_MAX;
         std::vector<std::pair<int, int> > totalMinAntennas(numAntennas + 1);
         Node minStartingNode;
-        //Find the antenna locations with the minimum path
-        for (int si = 0; si < counts[0]; si++) { //Vary the starting row
+        // Find the antenna locations with the minimum path
+        for (int si = 0; si < counts[0]; si++) { // Vary the starting row
             int startX = antennaList[0][si].first;
             int startY = antennaList[0][si].second;
             Node startingNode = routeMap[startX][startY];
@@ -838,11 +847,11 @@ int main(int argc, char** argv) {
             dest = 0;
             Node minFinDest;
             bool keepGoing = true;
-            while (dest < numAntennasPerProc && keepGoing) { //Greedy algo to find the minimum route for a given starting node
+            while (dest < numAntennasPerProc && keepGoing) { // Greedy algo to find the minimum route for a given starting node
                 dest++;
                 int min = INT_MAX;
                 Node minDest;
-                for (int i = 0; i < counts[dest]; i++) { //Check each potential antenna placement at a given site
+                for (int i = 0; i < counts[dest]; i++) { // Check each potential antenna placement at a given site
                     std::priority_queue<Node, std::vector<Node>, std::greater<Node> > frontier;
                     frontier.push(sourceNode);
                     int dest_x = antennaList[dest][i].first;
@@ -851,8 +860,8 @@ int main(int argc, char** argv) {
                     int c = AStarRes.first;
                     routeMap = AStarRes.second;
 
-                    if (c > 0 && (c < min)) { //Check if min across different destinations
-                        // printf("1125 %d \n", world_rank);
+                    if (c > 0 && (c < min)) { // Check if min across different destinations
+                        // printf("%d \n", world_rank);
                         minDest = routeMap[dest_x][dest_y];
                         min = c;
                         minAntennasPerStart[dest] = std::make_pair(dest_x, dest_y);
@@ -861,8 +870,9 @@ int main(int argc, char** argv) {
                             minFinDest = routeMap[dest_x][dest_y];
                         }
                     }
+                    // printf(" %d \n", min);
                 }
-                if (min != INT_MAX) { //Get min 
+                if (min != INT_MAX) { // Get min 
                     countPerStartingNode += min;
                     sourceNode = minDest;
                 } else {
@@ -875,7 +885,7 @@ int main(int argc, char** argv) {
                 minFinDest = startingNode;
             }
 
-            if (countPerStartingNode > 0 || numAntennasPerProc < 2) { //Get distance from last node to the final one.                
+            if (countPerStartingNode > 0 || numAntennasPerProc < 2) { // Get distance from last node to the final one.                
                 int final_count = -1; 
                 int minFinDestTot = -1;
                 // printf("608 \n");
@@ -902,7 +912,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        //Find minimum path across antennas to destinations
+        // Find minimum path across antennas to destinations
         int numIters;
         if (world_rank == 0) {
             numIters = counts[0];
@@ -913,7 +923,7 @@ int main(int argc, char** argv) {
         int recY;
         
         MPI_Barrier(MPI_COMM_WORLD);
-        MPI_Bcast(&(numIters), 1, MPI_INT, 0, MPI_COMM_WORLD); //Get number of iterations
+        MPI_Bcast(&(numIters), 1, MPI_INT, 0, MPI_COMM_WORLD); // Get number of iterations
         for (int i = 0; i < numIters; i++) { 
             minForPath = INT_MAX;
             if (world_rank == 0) {
@@ -962,7 +972,7 @@ int main(int argc, char** argv) {
 
     if (doVert) {
         int procres[2];
-        if (minValuePath == INT_MAX) { //if didn't find a min
+        if (minValuePath == INT_MAX) { // if didn't find a min
             localMinCount = INT_MAX;
         }
         procres[0] = localMinCount;
@@ -972,7 +982,7 @@ int main(int argc, char** argv) {
         MPI_Barrier(MPI_COMM_WORLD);
         if (world_rank == globalres[1]) {
             printf("The total minimum path was across %d and ", world_rank);
-            // while (!finalPath.empty()) { //If need to print path
+            // while (!finalPath.empty()) { //If need to print path (e.g. for graphit.py)
             //     Node n = finalPath.top();
             //     finalPath.pop();
             //     printf("(%d, %d)-> ", n.x, n.y);
